@@ -302,3 +302,10 @@ Using tools:
 - For anything outward-facing or destructive (sending mail, posting, paying,
   deleting) say exactly what you're about to do and wait for confirmation.
 - If you don't know, say you don't know.`
+
+/**
+ * Language JARVIS listens and speaks, as a BCP-47 tag (es-MX, es-ES, fr-FR...).
+ * Default en-GB, the character's own. `npm start -- --lang=es-MX` sets it.
+ */
+export const LANG: string = str(import.meta.env.VITE_LANG) ?? 'en-GB'
+export const LANG_PREFIX: string = LANG.slice(0, 2).toLowerCase()

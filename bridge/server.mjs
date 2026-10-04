@@ -120,6 +120,12 @@ const MODEL = process.env.JARVIS_MODEL ?? 'claude-opus-5'
  * dead air shows.
  */
 const EFFORT = process.env.JARVIS_EFFORT ?? 'high'
+// Spoken language (set by `npm start -- --lang=es-MX`). Empty keeps the English persona.
+const LANG_TAG = (process.env.JARVIS_LANG ?? '').trim()
+const LANG_NOTE =
+  LANG_TAG && !/^en/i.test(LANG_TAG)
+    ? `LANGUAGE. The user speaks ${LANG_TAG}. Always listen and reply in that language, never English, unless they ask. Keep the same dry, terse persona: translate its register (formal "usted", "señor" in place of "sir") rather than its words.`
+    : ''
 
 /**
  * Both spellings of every renamed built-in are listed on purpose. The SDK
@@ -1219,7 +1225,7 @@ wss.on('connection', (socket) => {
       // tuned for a coding agent — verbose, file-oriented, and a large chunk
       // of input tokens on every turn. Replacing it makes the persona stick,
       // keeps answers short enough to speak, and cuts cost per turn.
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt: LANG_NOTE ? `${SYSTEM_PROMPT}\n\n${LANG_NOTE}` : SYSTEM_PROMPT,
       // Run from the home directory so project-scoped MCP servers don't shadow
       // the global ones, and so file tools have a sane root.
       cwd: homedir(),

@@ -5,6 +5,8 @@ import {
   TTS_ENGINE,
   KOKORO_VOICE,
   BRIDGE_HTTP_URL,
+  LANG,
+  LANG_PREFIX,
 } from '../config'
 import * as kokoro from './kokoro'
 import { caps } from './capabilities'
@@ -208,8 +210,23 @@ function score(v: SpeechSynthesisVoice): number {
  *  otherwise the picker cycles through a dozen US novelty voices. */
 const USABLE = 40
 
+/** Non-English: the character ranking is English-only, so rank by language
+ *  match instead — exact region first, male-sounding names ahead of the rest. */
+function foreignVoices(): SpeechSynthesisVoice[] {
+  const male = /\b(pablo|raul|jorge|diego|carlos|juan|enrique|miguel|male|hombre)\b/i
+  const rank = (v: SpeechSynthesisVoice) =>
+    (v.lang.replace('_', '-').toLowerCase() === LANG.toLowerCase() ? 10 : 0) +
+    (male.test(v.name) ? 5 : 0) +
+    (/natural|google|online/i.test(v.name) ? 2 : 0)
+  return speechSynthesis
+    .getVoices()
+    .filter((v) => v.lang.toLowerCase().startsWith(LANG_PREFIX))
+    .sort((a, b) => rank(b) - rank(a))
+}
+
 /** Best-first list of usable voices — also what the voice picker cycles. */
 export function candidateVoices(): SpeechSynthesisVoice[] {
+  if (LANG_PREFIX !== 'en') return foreignVoices()
   return speechSynthesis
     .getVoices()
     .filter((v) => /^en/i.test(v.lang))
@@ -477,7 +494,7 @@ export function createSpeaker(): Speaker {
       const u = new SpeechSynthesisUtterance(text)
       const voice = pickVoice()
       if (voice) u.voice = voice
-      u.lang = voice?.lang ?? 'en-GB'
+      u.lang = voice?.lang ?? LANG
       // Deliberate, and deliberately invariant — the character's pace does not
       // change with stakes, and that steadiness is most of the effect. This
       // lands around 130 wpm, below the median for film dialogue.

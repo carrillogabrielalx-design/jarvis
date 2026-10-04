@@ -8,6 +8,7 @@
  *
  * Pass --writes to allow JARVIS to take real actions (drive the phone, the
  * browser, send things): `npm start -- --writes`.
+ * Pass --lang=es-MX (or es-ES, fr-FR, ...) to change the spoken language.
  */
 
 import { spawn } from 'node:child_process'
@@ -45,6 +46,9 @@ function vendorWasm() {
 }
 
 const writes = process.argv.includes('--writes')
+// `npm start -- --lang=es-MX` — language JARVIS listens and speaks (default en-GB).
+const langArg = process.argv.find((a) => a.startsWith('--lang='))
+const lang = langArg ? langArg.slice('--lang='.length).trim() : ''
 
 // A dim label per process, so the interleaved logs stay readable.
 const paint = (tag, colour) => (line) =>
@@ -106,6 +110,7 @@ process.on('SIGTERM', () => shutdown(0))
  */
 const port = process.env.PORT
 const bridgeEnv = writes ? { JARVIS_ALLOW_WRITES: '1' } : {}
+if (lang) bridgeEnv.JARVIS_LANG = lang
 if (port) {
   bridgeEnv.JARVIS_ALLOWED_ORIGINS = `http://localhost:${port},http://127.0.0.1:${port}`
   console.log(`  serving the face on port ${port}; the bridge will accept it.\n`)
@@ -117,7 +122,7 @@ console.log('\nJ.A.R.V.I.S. starting — the brain and the face.\n')
 run('bridge', 'node', ['bridge/server.mjs'], '36', bridgeEnv)
 // npm is a shell script on most systems; call the vite binary directly so we do
 // not need shell:true (which would break the argument handling above).
-run('face', process.execPath, ['node_modules/vite/bin/vite.js'], '35', {})
+run('face', process.execPath, ['node_modules/vite/bin/vite.js'], '35', lang ? { VITE_LANG: lang } : {})
 
 console.log(
   '\nWhen it says the dev server is ready, open the URL it prints in Chrome,\n' +
