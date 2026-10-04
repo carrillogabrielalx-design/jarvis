@@ -1,4 +1,4 @@
-import { BRIDGE_HTTP_URL } from '../config'
+import { BRIDGE_HTTP_URL, LANG, WAKE_ALIASES } from '../config'
 import { getMic } from './audio'
 import { speakingNow, speakingSince } from './tts'
 import { startVad, type Vad } from './vad'
@@ -77,8 +77,11 @@ const WAKE_DEBOUNCE = 1500
  * used to be silently discarded, so the wake word "just didn't work" with no
  * indication why. Better a rare false wake than a name that does not answer.
  */
-const WAKE =
-  /\b(?:hey|hi|ok|okay|yo)?\s*(?:jarvis|jarvys|jervis|jarvis's|travis|jarviss|java's|jarv)\b(?!'s)/i
+const escapeRe = (a: string) => a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const WAKE = new RegExp(
+  `\\b(?:hey|hi|ok|okay|yo|oye|hola|ey)?\\s*(?:${WAKE_ALIASES.map(escapeRe).join('|')})\\b(?!'s)`,
+  'i',
+)
 
 /** Everything after the wake phrase, which is usually the actual command. */
 function afterWake(text: string): string {
@@ -267,7 +270,10 @@ const norm = (s: string) =>
  * would be the single most infuriating failure this file could have.
  */
 const OVERRIDE =
-  /\b(stop|wait|jarvis|cancel|enough|quiet|hold on|shut up|never ?mind|forget it|no)\b/i
+  new RegExp(
+    `\\b(stop|wait|${WAKE_ALIASES.map(escapeRe).join('|')}|cancel|enough|quiet|hold on|shut up|never ?mind|forget it|no|para|espera|c[aá]llate|basta|cancela|silencio|det[eé]n|olv[ií]dalo)\\b`,
+    'i',
+  )
 
 /**
  * Words too common to be evidence of anything.
@@ -760,7 +766,7 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
     rec = new Ctor()
     rec.continuous = true
     rec.interimResults = true
-    rec.lang = 'en-GB'
+    rec.lang = LANG
     rec.onstart = () => {
       running = true
       diag.running = true

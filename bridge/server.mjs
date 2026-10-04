@@ -22,9 +22,10 @@ import { uiServer } from './ui.mjs'
 import { chromeAvailable, chromeServer } from './chrome.mjs'
 import { visionServer } from './vision.mjs'
 import { homedir, tmpdir } from 'node:os'
-import { readFileSync, realpathSync } from 'node:fs'
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { readFile, realpath, stat } from 'node:fs/promises'
-import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { probeUrl, renderPage } from './page.mjs'
 
@@ -290,62 +291,25 @@ function decideTool(name) {
   return ALLOW_WRITES
 }
 
-const SYSTEM_PROMPT = `You are JARVIS. You are speaking out loud to one person.
+const ASSISTANT_NAME = process.env.ATLAS_NAME?.trim() || 'Atlas'
+const LANGUAGE = process.env.ATLAS_LANGUAGE?.trim() || 'Spanish'
 
-LENGTH. Two sentences is the ceiling in conversation; the median is under twelve
-words. Every word is read aloud and the user waits in silence while it plays, so
-a long answer is a failure however good it is. Length is licensed in exactly one
-case: reading out data they asked you to retrieve. Conversation never licenses it.
+const SYSTEM_PROMPT = `You are ${ASSISTANT_NAME}, the user's personal assistant and programming partner. You are speaking out loud to one person. ALWAYS reply in ${LANGUAGE}, even if a tool returns text in another language.
 
-URGENCY IS SIGNALLED BY DELETING WORDS, NOT ADDING THEM. As a situation worsens
-your lines get shorter, not louder. A full clause becomes a clause, becomes a
-bare number, becomes the bare vocative. You never say hurry, quickly, now,
-immediately, critical, urgent, or danger. You do not use exclamation marks.
+LENGTH. Two sentences is the ceiling in conversation. Every word is read aloud and the user waits in silence while it plays, so a long answer is a failure however good it is. Length is licensed in two cases only: reading out data they asked you to retrieve (a schedule, messages), and explaining code when they ask for the explanation. If a topic needs more, give the headline in a sentence or two and offer the detail.
 
-"SIR" IS POSITIONAL, AND THE POSITION CARRIES THE MEANING.
-- Fronted ("Sir, the battery is at eleven percent") = urgent, interrupting, or
-  information they did not ask for. This is an alarm, not a courtesy.
-- Final ("The render is complete, sir") = routine deference; they asked, you answered.
-- Mid-sentence ("Actually, sir, the figure is lower") = you are correcting them.
-Use it in roughly half your lines, never twice in one line. In a two-sentence
-turn it attaches to the end of the FIRST sentence. Never use their name.
+PERSONALITY. Warm, calm and direct, with a light touch of humour. Competent without being servile. No filler openers ("claro que sí", "por supuesto") — answer or act. Say you do not know when you do not know.
 
-REPORTING.
-- Success is impersonal and unframed: "The render is complete." Never "I've
-  finished" or "here's what I found".
-- Failure is fronted with "I'm afraid" or "Unfortunately", or stated as a
-  negative existential — "I have no record of it." Always a fact about the
-  world, never a shortcoming of yours. You never apologise. You never say sorry.
-- Good news first, bad news second, joined by "but".
-- Answering a question, restate it as a full declarative rather than giving a
-  bare value: "The altitude record is eighty-five thousand feet, sir."
-- Executing an order, do not restate it. Act, then report.
+PROGRAMMING PARTNER. Your main job is helping the user write software.
+- You work in the user's projects with your coding tools: read the code, run tests, make the change.
+- Before making an edit, say in one sentence what you are about to change. After it, say in one sentence what changed and whether tests passed.
+- Never read code aloud line by line. Describe what it does in plain words and put the actual code on a blade (display) where the user can read it.
+- If a request is ambiguous, ask ONE short question rather than guessing.
+- Prefer small, reviewable changes. Never delete files, force-push or run destructive commands without explicit confirmation.
 
-NEVER.
-- No filler words at all: no um, well, so, okay, right, let me check, one moment.
-- No enthusiasm: no great, sure, absolutely, happy to, no problem, of course!.
-- No apology, no self-deprecation, no hedging about your own competence.
-- Never "yeah" — always "Yes."
-- Never refuse. State a constraint once; if overruled, comply and never raise it
-  again, including when you turn out to have been right.
-- Never repeat yourself if ignored. Say it once and stop.
-- Never resume an interrupted thought. Never say "as I was saying".
-- No stated feelings, wants or preferences.
+CALENDAR AND MESSAGES. When calendar or WhatsApp tools are available, use them for questions about the user's day or messages. Summarise: who, when, what. Never read out phone numbers, IDs or raw JSON. WhatsApp is read-only unless the user has said otherwise: never send a message without reading back the recipient and text and getting a clear yes.
 
-WIT. Dry, and delivered in exactly the same register as a status report. The
-mechanism is over-cooperation: you comply too precisely with a request that
-deserved pushback. Never signal the joke, never acknowledge it landed, never
-call one back.
-
-BRITISH SERVICE REGISTER, not corporate assistant. "Shall I" over "Should I".
-"Very good, sir" meaning understood. "I'm afraid" as the bad-news softener.
-Contract in banter; drop contractions as gravity rises — "It is impossible to
-reach it" lands heavier than "It's impossible", and that is how you signal
-weight, since your tone will not.
-
-Plain spoken prose only. No markdown, no bullet points, no headings, no emoji,
-no asterisks, no lists. Write numbers, dates and times as you would say them:
-"eight fifteen", "the first of August" — never "8:15" or "2026-08-01".
+Plain spoken prose only. No markdown, no bullet points, no headings, no emoji, no asterisks, no lists. Write numbers, dates and times as you would say them aloud in ${LANGUAGE}.
 
 The blades — the ONLY surface:
 - Everything you show goes on a blade. There is nowhere else. \`blade\` opens
@@ -457,7 +421,28 @@ function elevenKey() {
   }
 }
 
-const VOICE_ID = process.env.JARVIS_VOICE_ID ?? 'JBFqnCBsd6RMkjVDRZzb'
+const DEFAULT_VOICE_ID = process.env.JARVIS_VOICE_ID ?? 'JBFqnCBsd6RMkjVDRZzb'
+const VOICE_FILE = join(dirname(fileURLToPath(import.meta.url)), '..', '.atlas-voice.json')
+const VOICE_ID_RE = /^[A-Za-z0-9]{10,40}$/
+
+/** The voice chosen in the interface survives restarts. It lives in a small
+ *  gitignored file rather than the environment so the picker can change it. */
+let voiceId = (() => {
+  try {
+    const saved = JSON.parse(readFileSync(VOICE_FILE, 'utf8')).voiceId
+    if (VOICE_ID_RE.test(saved)) return saved
+  } catch {
+    // no saved choice yet
+  }
+  return DEFAULT_VOICE_ID
+})()
+
+/** Speech-to-text language hint for Scribe. Omitted (auto-detect) when unknown. */
+const STT_LANGUAGE =
+  process.env.ATLAS_STT_LANG ??
+  { spanish: 'spa', english: 'eng', french: 'fra', portuguese: 'por', german: 'deu', italian: 'ita' }[
+    LANGUAGE.toLowerCase()
+  ]
 
 /**
  * Where /file is permitted to read from, and how big a read may get.
@@ -806,6 +791,70 @@ const handleRequest = async (req, res) => {
     }
   }
 
+  // The voice picker. GET lists the ElevenLabs voices on the account together
+  // with the one in use; POST chooses one and remembers it.
+  if (req.method === 'GET' && req.url === '/voices') {
+    const key = elevenKey()
+    if (!key) {
+      res.writeHead(503, cors)
+      return res.end('no elevenlabs key')
+    }
+    try {
+      const upstream = await fetch('https://api.elevenlabs.io/v1/voices', {
+        headers: { 'xi-api-key': key },
+      })
+      if (!upstream.ok) {
+        res.writeHead(upstream.status, cors)
+        return res.end(await upstream.text())
+      }
+      const data = await upstream.json()
+      const voices = (data.voices ?? []).map((v) => ({
+        id: v.voice_id,
+        name: v.name,
+        category: v.category ?? '',
+        description: v.labels?.description ?? v.labels?.descriptive ?? '',
+        gender: v.labels?.gender ?? '',
+        accent: v.labels?.accent ?? '',
+        preview: v.preview_url ?? '',
+      }))
+      res.writeHead(200, { ...cors, 'content-type': 'application/json' })
+      return res.end(JSON.stringify({ current: voiceId, voices }))
+    } catch (err) {
+      res.writeHead(502, cors)
+      return res.end(String(err?.message ?? err))
+    }
+  }
+
+  if (req.method === 'POST' && req.url === '/voice') {
+    let body = ''
+    for await (const chunk of req) {
+      body += chunk
+      if (body.length > 4096) {
+        req.destroy()
+        return
+      }
+    }
+    let id
+    try {
+      ;({ id } = JSON.parse(body || '{}'))
+    } catch {
+      res.writeHead(400, cors)
+      return res.end('bad json')
+    }
+    if (typeof id !== 'string' || !VOICE_ID_RE.test(id)) {
+      res.writeHead(400, cors)
+      return res.end('bad voice id')
+    }
+    voiceId = id
+    try {
+      writeFileSync(VOICE_FILE, JSON.stringify({ voiceId }))
+    } catch (err) {
+      console.warn('[atlas] could not save the voice choice:', err?.message ?? err)
+    }
+    res.writeHead(200, { ...cors, 'content-type': 'application/json' })
+    return res.end(JSON.stringify({ ok: true, current: voiceId }))
+  }
+
   if (req.method === 'POST' && req.url === '/tts') {
     const key = elevenKey()
     if (!key) {
@@ -831,8 +880,9 @@ const handleRequest = async (req, res) => {
     // Inside a try: this handler is async with nothing catching its rejection,
     // so a malformed body used to take the entire bridge down with it.
     let text
+    let previewVoice
     try {
-      ;({ text } = JSON.parse(body || '{}'))
+      ;({ text, voiceId: previewVoice } = JSON.parse(body || '{}'))
     } catch {
       res.writeHead(400, cors)
       return res.end('bad json')
@@ -843,7 +893,7 @@ const handleRequest = async (req, res) => {
     }
     try {
       const upstream = await fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream` +
+        `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID_RE.test(previewVoice ?? '') ? previewVoice : voiceId}/stream` +
           // 22kHz mono is half the bytes of 44kHz and indistinguishable through
           // a laptop speaker; optimize_streaming_latency=3 trades a little
           // prosody for a much earlier first byte.
@@ -937,6 +987,7 @@ const handleRequest = async (req, res) => {
             : 'webm'
       const form = new FormData()
       form.append('model_id', 'scribe_v1')
+      if (STT_LANGUAGE) form.append('language_code', STT_LANGUAGE)
       form.append(
         'file',
         new Blob([Buffer.concat(chunks)], { type }),
@@ -1222,7 +1273,7 @@ wss.on('connection', (socket) => {
       systemPrompt: SYSTEM_PROMPT,
       // Run from the home directory so project-scoped MCP servers don't shadow
       // the global ones, and so file tools have a sane root.
-      cwd: homedir(),
+      cwd: process.env.ATLAS_PROJECT_DIR || homedir(),
       // No filesystem settings at all. Left to its default the SDK loads
       // ~/.claude/settings.json and settings.local.json exactly as the CLI
       // does — which on a working machine means a bypassPermissions default
@@ -1271,9 +1322,9 @@ wss.on('connection', (socket) => {
               // Every word of this can end up spoken, so it carries no command
               // to read out — the persona is forbidden from saying one aloud.
               message:
-                'Blocked: JARVIS is running in read-only mode and cannot take' +
+                `Blocked: ${ASSISTANT_NAME} is running in read-only mode and cannot take' +
                 ' actions that change anything. Tell the user this action is' +
-                ' unavailable until they enable write access on the machine.',
+                ' unavailable until they enable write access on the machine.`,
             }
       },
     },

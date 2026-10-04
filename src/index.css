@@ -1896,3 +1896,33 @@ kbd {
   transform: scaleX(-1);
   background: #000;
 }
+
+/* ---- voice picker (V) ---------------------------------------------------- */
+.vp {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 30;
+  width: min(26rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  padding: 0.75rem 0.9rem;
+  background: rgba(2, 10, 12, 0.95);
+  border: 1px solid var(--accent, #19d8d2);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.74rem;
+  color: #cfe6e3;
+  backdrop-filter: blur(6px);
+}
+.vp-head { letter-spacing: 0.14em; color: var(--accent, #19d8d2); margin-bottom: 0.5rem; }
+.vp-status { color: #8fb3b0; margin-bottom: 0.5rem; }
+.vp-list { list-style: none; margin: 0; padding: 0; }
+.vp-row { display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0; border-top: 1px solid rgba(25, 216, 210, 0.15); }
+.vp-on .vp-name { color: #3ef2a8; }
+.vp-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.vp-name small { color: #6d8886; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vp button {
+  font: inherit; color: var(--accent, #19d8d2); background: transparent;
+  border: 1px solid var(--accent, #19d8d2); padding: 0.15rem 0.5rem; cursor: pointer;
+}
+.vp button:disabled { opacity: 0.45; cursor: default; }

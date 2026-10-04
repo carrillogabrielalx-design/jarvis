@@ -5,6 +5,7 @@ import {
   TTS_ENGINE,
   KOKORO_VOICE,
   BRIDGE_HTTP_URL,
+  LANG,
 } from '../config'
 import * as kokoro from './kokoro'
 import { caps } from './capabilities'
@@ -164,6 +165,9 @@ const MAX_UNSPOKEN = 220
 
 const VOICE_PREF_KEY = 'jarvis.voice'
 
+const LANG_PREFIX = LANG.slice(0, 2).toLowerCase()
+const LANG_IS_ENGLISH = LANG_PREFIX === 'en'
+
 /**
  * Rank installed voices by how close they are to the character: a British
  * male, low and level, not a novelty voice.
@@ -176,6 +180,19 @@ const VOICE_PREF_KEY = 'jarvis.voice'
 function score(v: SpeechSynthesisVoice): number {
   const n = v.name.toLowerCase()
   let s = 0
+
+  // Non-English assistants: any voice in the configured language qualifies;
+  // the quality tiers below decide the order. The English-butler heuristics
+  // are skipped.
+  if (!LANG_IS_ENGLISH) {
+    if (!v.lang.toLowerCase().startsWith(LANG_PREFIX)) return -1000
+    s = USABLE
+    if (v.lang.toLowerCase().replace('_', '-') === LANG.toLowerCase()) s += 10
+    if (n.includes('premium')) s += 30
+    else if (n.includes('enhanced')) s += 20
+    else if (n.includes('google')) s += 10
+    return s
+  }
 
   // The macOS British male, and the closest thing to the character available
   // without leaving the machine.
@@ -212,7 +229,7 @@ const USABLE = 40
 export function candidateVoices(): SpeechSynthesisVoice[] {
   return speechSynthesis
     .getVoices()
-    .filter((v) => /^en/i.test(v.lang))
+    .filter((v) => v.lang.toLowerCase().startsWith(LANG_PREFIX))
     .map((v) => ({ v, s: score(v) }))
     .filter((x) => x.s >= USABLE)
     .sort((a, b) => b.s - a.s)
@@ -236,7 +253,7 @@ function pickVoice(): SpeechSynthesisVoice | null {
     localStorage.removeItem(VOICE_PREF_KEY)
   }
 
-  cachedVoice = candidateVoices()[0] ?? all.find((v) => /^en/i.test(v.lang)) ?? null
+  cachedVoice = candidateVoices()[0] ?? all.find((v) => v.lang.toLowerCase().startsWith(LANG_PREFIX)) ?? null
   return cachedVoice
 }
 
@@ -477,7 +494,7 @@ export function createSpeaker(): Speaker {
       const u = new SpeechSynthesisUtterance(text)
       const voice = pickVoice()
       if (voice) u.voice = voice
-      u.lang = voice?.lang ?? 'en-GB'
+      u.lang = voice?.lang ?? LANG
       // Deliberate, and deliberately invariant — the character's pace does not
       // change with stakes, and that steadiness is most of the effect. This
       // lands around 130 wpm, below the median for film dialogue.

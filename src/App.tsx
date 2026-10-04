@@ -4,6 +4,7 @@ import { Hud } from './ui/Hud'
 import { Boot } from './ui/Boot'
 import { Ignition } from './ui/Ignition'
 import { Diagnostics } from './ui/Diagnostics'
+import { VoicePicker, VOICE_PICKER_EVENT } from './ui/VoicePicker'
 import { useStore } from './store'
 import { startVoice, type Voice, type VoiceMode } from './lib/voice'
 import { createSpeaker, cycleVoice, currentVoiceName } from './lib/tts'
@@ -30,8 +31,8 @@ import {
   type Msg,
 } from './lib/brain'
 import { startAnalyser, micLevel } from './lib/audio'
-import { probeCapabilities } from './lib/capabilities'
-import { env } from './config'
+import { probeCapabilities, caps } from './lib/capabilities'
+import { env, WAKE_ALIASES } from './config'
 
 /**
  * The conversation.
@@ -63,11 +64,11 @@ const newId = () =>
 
 /** The same mishearings voice.ts accepts for the wake word — otherwise a turn
  *  that woke him as "travis" gets that word sent on to the model as a question. */
-const NAME = '(?:jarvis|jarvys|jervis|travis|jarviss|java\'s|jarv)'
+const NAME = `(?:${WAKE_ALIASES.map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`
 /** A bare vocative — "Jarvis", "hey jarvis" — with nothing asked. */
-const BARE_NAME = new RegExp(`^(?:hey|hi|ok|okay|yo)?\\s*${NAME}[\\s,.!?]*$`, 'i')
+const BARE_NAME = new RegExp(`^(?:hey|hi|ok|okay|yo|oye|hola|ey)?\\s*${NAME}[\\s,.!?]*$`, 'i')
 /** A leading vocative on a real command: "Jarvis, what's the weather". */
-const LEADING_NAME = new RegExp(`^(?:hey|hi|ok|okay|yo)?\\s*${NAME}\\b[\\s,.:!?-]*`, 'i')
+const LEADING_NAME = new RegExp(`^(?:hey|hi|ok|okay|yo|oye|hola|ey)?\\s*${NAME}\\b[\\s,.:!?-]*`, 'i')
 
 export default function App() {
   const store = useStore
@@ -591,12 +592,17 @@ export default function App() {
         !e.altKey
       ) {
         e.preventDefault()
+        // With ElevenLabs the voice is chosen from your account's list.
+        if (caps().tts) {
+          window.dispatchEvent(new Event(VOICE_PICKER_EVENT))
+          return
+        }
         const name = cycleVoice()
         store.getState().setVoice(name)
         silence()
         const demo = createSpeaker()
         speaker.current = demo
-        demo.say(`Voice set to ${name.replace(/\(.*?\)/g, '').trim()}. At your service, sir.`)
+        demo.say(`Voz: ${name.replace(/\(.*?\)/g, '').trim()}.`)
         void demo.end()
         return
       }
@@ -701,6 +707,7 @@ export default function App() {
       <Hud />
       <Boot />
       <Diagnostics />
+      <VoicePicker />
       <Ignition onStart={() => void powerOn()} />
     </>
   )

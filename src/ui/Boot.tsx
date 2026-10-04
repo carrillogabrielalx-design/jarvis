@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useStore } from '../store'
+import { ASSISTANT_NAME } from '../config'
 
 /**
  * The start-up sequence, rebuilt to the Iron Man boot it is quoting.
@@ -146,7 +147,7 @@ function Rings({ reduced }: { reduced: boolean }) {
         animate={{ opacity: 1, letterSpacing: '0.42em' }}
         transition={{ duration: 0.7, delay: 0.5, ease }}
       >
-        J.A.R.V.I.S
+        {ASSISTANT_NAME.toUpperCase()}
       </motion.text>
     </svg>
   )

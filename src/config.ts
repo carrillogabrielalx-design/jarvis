@@ -128,6 +128,32 @@ export const KOKORO_VOICE = choice(
   'bm_george',
 )
 
+/**
+ * The assistant's name — what the wake phrase listens for and what the
+ * interface shows. Set VITE_ASSISTANT_NAME in .env.local to change it.
+ */
+export const ASSISTANT_NAME = str(import.meta.env.VITE_ASSISTANT_NAME) ?? 'Atlas'
+
+/**
+ * Extra spellings the speech recogniser tends to return for the name, comma
+ * separated in VITE_WAKE_ALIASES. Recognisers rarely know a custom name, so
+ * listing the mishearings you see in the transcript is how you tune the wake
+ * word. Case-insensitive.
+ */
+export const WAKE_ALIASES: string[] = [
+  ASSISTANT_NAME,
+  ...(str(import.meta.env.VITE_WAKE_ALIASES)?.split(',') ?? []),
+]
+  .map((a) => a.trim().toLowerCase())
+  .filter(Boolean)
+
+/**
+ * Language for speech recognition and the browser voice (BCP 47). Spanish by
+ * default. The assistant itself answers in this language too — the bridge reads
+ * the same choice from ATLAS_LANGUAGE.
+ */
+export const LANG = str(import.meta.env.VITE_LANG) ?? 'es-ES'
+
 export const env = {
   anthropicKey: str(import.meta.env.VITE_ANTHROPIC_API_KEY) ?? '',
   elevenKey: str(import.meta.env.VITE_ELEVENLABS_API_KEY) ?? '',
@@ -276,7 +302,7 @@ export const activeServers = () => MCP_SERVERS.filter((s) => s.enabled && s.url)
  * fuller version in bridge/server.mjs — that's the one that gets used by
  * default, and the one worth editing.
  */
-export const SYSTEM_PROMPT = `You are JARVIS, Tony Stark's assistant. You are speaking out loud.
+export const SYSTEM_PROMPT = `You are ${ASSISTANT_NAME}, a personal assistant and programming partner. Reply in the language with code ${LANG}. You are speaking out loud.
 
 THE HARD RULE: your entire reply must be under 60 words. This is not a style
 preference — every word is read aloud by a speech synthesiser and the user is

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useStore } from '../store'
+import { ASSISTANT_NAME } from '../config'
 
 /**
  * Rotating example commands, shown only while idle.
@@ -12,16 +13,15 @@ import { useStore } from '../store'
  * Each line is phrased the way you'd actually say it, not as a feature name.
  */
 const EXAMPLES = [
-  'what happened in AI this week',
-  'generate an image of the Mark Seven suit',
-  'take a screenshot of my phone',
-  "what's on my calendar tomorrow",
-  'search for the best coffee near me',
-  'read me the top story on Hacker News',
-  'open my GitHub notifications',
-  "summarise what's in my inbox",
-  'find me a loading animation',
-  "what's the weather looking like",
+  'qué tengo en la agenda mañana',
+  'explícame este error de mi código',
+  'revisa los cambios de mi proyecto',
+  'ayúdame a escribir una función',
+  'qué mensajes nuevos tengo en WhatsApp',
+  'busca cómo usar async await en JavaScript',
+  'resúmeme mi día',
+  'crea una rama para esta idea',
+  'cómo va el clima hoy',
 ]
 
 const ROTATE_MS = 4200
@@ -52,7 +52,7 @@ export function Suggestions() {
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.35 }}
         >
-          “hey jarvis, {EXAMPLES[i]}”
+          “hey {ASSISTANT_NAME.toLowerCase()}, {EXAMPLES[i]}”
         </motion.span>
       </AnimatePresence>
     </div>

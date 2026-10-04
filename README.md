@@ -1,4 +1,15 @@
-# J.A.R.V.I.S.
+# Atlas (based on J.A.R.V.I.S.)
+
+> **Atlas quick setup.** The assistant's name, language and voice are
+> configurable, and it answers in Spanish by default. Say **"Hey Atlas"**.
+> - Name: `VITE_ASSISTANT_NAME` (`.env.local`) and `ATLAS_NAME` (bridge).
+> - Language: `VITE_LANG` (e.g. `es-MX`) and `ATLAS_LANGUAGE` (e.g. `Spanish`).
+> - Voice: with an ElevenLabs key, press **V** to pick one from your account;
+>   the choice is saved in `.atlas-voice.json`.
+> - Coding: set `ATLAS_PROJECT_DIR` to your projects folder and start with
+>   `npm run bridge:writes` so he can edit files and run commands.
+> - Wake word misheard? Add what the transcript shows to `VITE_WAKE_ALIASES`.
+
 
 A browser voice assistant with an Iron Man holographic interface. Say
 **"Hey Jarvis"**, he wakes, listens, and does real things through your tools —
