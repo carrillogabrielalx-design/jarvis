@@ -155,8 +155,13 @@ const EMBED_FEATURES = new Set([
  * several clips on it from pulling megabytes nobody asked for.
  */
 function hardenMedia(root: Element) {
-  root.querySelectorAll('img, video, iframe').forEach((el) => {
+  root.querySelectorAll('img, video').forEach((el) => {
     el.setAttribute('referrerpolicy', 'no-referrer')
+  })
+  // Embedded players (YouTube error 153) need the bare origin to play; they get
+  // that and nothing more.
+  root.querySelectorAll('iframe').forEach((el) => {
+    el.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin')
   })
 
   root.querySelectorAll('video').forEach((video) => {
